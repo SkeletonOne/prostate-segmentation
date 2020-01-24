@@ -34,12 +34,25 @@ class PathConfig(object):
 
 
 class TorchConfig(object):
-	device = ('cuda:0' if torch.cuda.is_available() else 'cpu')
-	batch_size = 8
+	device = torch.device(('cuda:0' if torch.cuda.is_available() else 'cpu'))
+	batch_size = 4
 	is_shuffle_for_train_data = False
 	train_epoch = 5
 
+	input_width = 512
+	input_height = 512
+	output_width = 512
+	output_height = 512
+
+	cos_dice_loss_factor = 1.7
+
+	learning_rate = 0.005
+
+	case_strs = [
+		'00', '01', '02', '03', '04', '05', '06', '07', '08', '09'
+	] + [str(i) for i in range(10, 50)]
+
 	@classmethod
-	def to_tensor(cls, ndarray):
+	def to_int_tensor(cls, ndarray):
 		ans = torch.from_numpy(ndarray)
-		return ans.to(device=cls.device)
+		return ans.int()
