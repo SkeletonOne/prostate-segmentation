@@ -97,6 +97,14 @@ class UNet(nn.Module):
 			nn.BatchNorm2d(1),
 			nn.ReLU()
 		)
+		self.final_conv_15 = nn.Sequential(
+			nn.Conv2d(
+				in_channels=1, out_channels=1,
+				kernel_size=1, stride=1, padding=0
+			),
+			nn.BatchNorm2d(1),
+			nn.ReLU()
+		)
 		# (bs, 64, 324, 324)
 
 		if 'loss_function' in kwargs:
@@ -233,7 +241,8 @@ class UNet(nn.Module):
 		decode13 = self.double_conv_decode_13(decode12)
 
 		decode14 = self.final_conv_14(decode13)
-		ans = self.pad_to_img_size(decode14)
+		decode15 = self.pad_to_img_size(decode14)
+		ans = self.final_conv_15(decode15)
 		return ans
 
 	def set_loss_function(self, loss_function: nn.Module):

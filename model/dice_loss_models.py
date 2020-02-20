@@ -5,6 +5,8 @@ import config
 
 
 def cal_DSC(predicts, targets):
+	# predicts = predicts.to(torch.device('cpu'))
+	# targets = targets.to(torch.device('cpu'))
 	batch_size = int(targets.shape[0])
 	smooth = 1
 	input_flat = predicts.view((batch_size, -1))
@@ -17,6 +19,15 @@ def cal_DSC(predicts, targets):
 	_b = i_sum + t_sum + smooth
 	ans = _a.float() / _b.float()
 	return ans
+
+
+def cal_average_loss(loss: torch.Tensor):
+	return loss.mean().item()
+
+
+def cal_dice_accuracy(predicts: torch.Tensor, targets: torch.Tensor):
+	dsc = cal_DSC(predicts, targets)
+	return dsc.mean().item()
 
 
 class DiceLoss(nn.Module):
@@ -42,7 +53,7 @@ class CosDiceLoss(nn.Module):
 		temp = (dsc * (np.pi / 2)).float()
 		t = torch.cos(temp)
 		ans = torch.pow(t, self.q_factor)
-		return ans
+		return ans.mean()
 
 
 if __name__ == '__main__':
@@ -63,10 +74,11 @@ if __name__ == '__main__':
 	# 	if batch_index == 6:
 	# 		b = batch_data[1]
 	# 		break
-	# # print(a.shape)
+	# # # print(a.shape)
 	# d = CosDiceLoss(1.7)
 	# # show_a_batch(a, 'a')
 	# # show_a_batch(b, 'b')
 	# loss = d(a, b)
 	# print(loss)
+	# print(cal_dice_accuracy(a, b))
 	pass

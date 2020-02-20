@@ -8,7 +8,24 @@ from torch.utils.data import Dataset, DataLoader
 import re
 from helper import *
 from torch.nn import functional as f
+from PIL import Image
 
+
+def cal_my_DSC(predicts, targets):
+	# predicts = predicts.to(torch.device('cpu'))
+	# targets = targets.to(torch.device('cpu'))
+	batch_size = int(targets.shape[0])
+	smooth = 1
+	input_flat = predicts.view((batch_size, -1))
+	target_flat = targets.view((batch_size, -1))
+	intersection = input_flat * target_flat  # 求交集
+	i_sum = input_flat.sum(dim=1)
+	t_sum = target_flat.sum(dim=1)
+	inter_sum = intersection.sum(dim=1)
+	_a = 2.0 * inter_sum + smooth
+	_b = i_sum + t_sum + smooth
+	ans = _a.float() / _b.float()
+	return ans.item()
 
 class CTScan(object):
 
@@ -50,9 +67,9 @@ class CTScan(object):
 		original_coordinate = np.array(list(itk_image.GetOrigin()))  # CT 原点坐标
 		space = np.array(list(itk_image.GetSpacing()))  # CT 像素间隔
 		return CTScan(
-			TorchConfig.to_int_tensor(numpy_image),
-			TorchConfig.to_int_tensor(original_coordinate),
-			TorchConfig.to_int_tensor(space)
+			TorchConfig.to_float_tensor(numpy_image),
+			TorchConfig.to_float_tensor(original_coordinate),
+			TorchConfig.to_float_tensor(space)
 		)
 
 	@classmethod
@@ -120,6 +137,18 @@ class CTScan(object):
 				tensor, [left_delta, right_delta, left_delta, right_delta]
 			)
 		return ans_tensor
+
+	@classmethod
+	def resize_image(cls, img_tensor: torch.Tensor, size: tuple):
+		return (
+			torch.from_numpy(
+				np.array(
+					Image.fromarray(
+						np.array(img_tensor)
+					).resize(size)
+				)
+			)
+		)
 
 
 class ProstateSegedSliceDataset(Dataset):
@@ -205,7 +234,7 @@ class ProstateSegedSliceDataset(Dataset):
 			t = []
 			for index, s in enumerate(train_slice_tuple):
 				s: Tensor
-				s = CTScan.pad_to_n_n_for_last_2_dim(s, 512)
+				s = CTScan.resize_image(s, (256, 256))
 				temps = s.unsqueeze(0)
 				t.append(temps)
 			t = tuple(t)
@@ -225,27 +254,49 @@ if __name__ == '__main__':
 	# 		print('case: {}, shape: {}'.format(case_str, seg_ct_scan_slice.shape))
 	# 		count += 1
 	# print('total = {}'.format(count))
-	# case_string = '34'
-	# ct_scan = CTScan.load_ct_torch_from_mhd(
-	# 	PathConfig.train_data_dir, case_string,
-	# 	True
-	# )
-	# seg_slices = ct_scan.get_slices()
-	# seg_slices = [CTScan.pad_to_n_n_for_last_2_dim(s, 324) for s in seg_slices]
+	case_string = '20'
+	ct_scan = CTScan.load_ct_torch_from_mhd(
+		PathConfig.train_data_dir, case_string,
+		True
+	)
+	seg_slices = ct_scan.get_slices()
+	seg_slices = [CTScan.resize_image(s, (256, 256)) for s in seg_slices]
+
+	ct_scan = CTScan.load_ct_torch_from_mhd(
+		PathConfig.test_data_dir, '00',
+		False
+	)
+	raw_slices = ct_scan.get_slices()
+	raw_slices = [CTScan.resize_image(s, (256, 256)) for s in raw_slices]
+
+	for i, v in enumerate(raw_slices):
+		save_one_slice(v, 'r' + str(i))
+
+	for i, v in enumerate(seg_slices):
+		save_one_slice(v, 's' + str(i))
+
 	#
-	# ct_scan = CTScan.load_ct_torch_from_mhd(
-	# 	PathConfig.train_data_dir, case_string,
-	# 	False
-	# )
-	# raw_slices = ct_scan.get_slices()
-	# raw_slices = [CTScan.pad_to_n_n_for_last_2_dim(s, 512) for s in raw_slices]
+	# ans_indexes = []
+	# total_best_ans = -1
+	# total_best_index = -1
+	# for r_index, raw_slice in enumerate(raw_slices):
+	# 	current_best_ans = -1
+	# 	ans_indexes.append(-1)
+	# 	for s_index, seg_slice in enumerate(seg_slices):
+	# 		current_ans = cal_my_DSC(raw_slice, seg_slice)
+	# 		if current_ans > current_best_ans:
+	# 			current_best_ans = current_ans
+	# 			ans_indexes[r_index] = (s_index, current_best_ans)
+	# 		if current_best_ans > total_best_ans:
+	# 			total_best_ans = current_best_ans
+	# 			total_best_index = r_index
 	#
-	# for index in range(6, 17, 1):
-	# 	# print(
-	# 	# 	'{}.raw.{}.shape = {} && {}.seg.{}.shape = {}'.format(
-	# 	# 		case_string, index, raw_slices[index].shape, case_string, index, seg_slices[index].shape
-	# 	# 	)
-	# 	# )
-	# 	show_one_slice(raw_slices[index], '{}.raw.{}'.format(case_string, index))
-	# 	show_one_slice(seg_slices[index], '{}.seg.{}'.format(case_string, index))
-	pass
+	# for i, jv in enumerate(ans_indexes):
+	# 	print('{}: {}, value is {:.5f}'.format(i, jv[0], jv[1]))
+	#
+	# print()
+	#
+	# print('the best is r is {}, s is {}, value is {:.5f}'.format(
+	# 	total_best_index, ans_indexes[total_best_index][0],
+	# 	ans_indexes[total_best_index][1]
+	# ))
